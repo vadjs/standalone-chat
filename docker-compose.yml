@@ -1,0 +1,46 @@
+services:
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smolchat-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Named volume persists HuggingFace model weights (~720 MB).
+      # Downloaded only on first run; reused on subsequent starts.
+      - model_cache:/model_cache
+    environment:
+      - HF_HOME=/model_cache
+      - TRANSFORMERS_CACHE=/model_cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # Generous start period: first run downloads the model weights before
+      # the server is ready to respond to health checks.
+      start_period: 300s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # This URL is baked into the Next.js JS bundle at build time.
+        # It MUST be the URL the user's browser can reach — i.e. the host port,
+        # not the internal Docker network hostname (backend:8000).
+        NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
+    container_name: smolchat-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  model_cache:
+    driver: local

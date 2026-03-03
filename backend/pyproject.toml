@@ -1,0 +1,32 @@
+[project]
+name = "smolchat-backend"
+version = "0.1.0"
+description = "SmolChat FastAPI backend"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.6",
+    "transformers>=4.45.0",
+    "accelerate>=0.26.0",
+    "pydantic>=2.9.2",
+    "torch>=2.3.0",
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "httpx>=0.27.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
