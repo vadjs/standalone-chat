@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
@@ -22,17 +22,13 @@ async def new_conversation():
 @router.post("/{conversation_id}/message", response_model=ChatResponse)
 async def send_message(conversation_id: str, body: MessageIn):
     # Build history from the request body — backend is stateless
-    model_history = [
-        {"role": m.role, "content": m.content} for m in body.messages
-    ]
+    model_history = [{"role": m.role, "content": m.content} for m in body.messages]
     model_history.append({"role": "user", "content": body.content})
 
     loop = asyncio.get_event_loop()
-    reply_text = await loop.run_in_executor(
-        None, model.generate_reply, model_history
-    )
+    reply_text = await loop.run_in_executor(None, model.generate_reply, model_history)
 
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
     return ChatResponse(
         conversation_id=conversation_id,
         role="assistant",

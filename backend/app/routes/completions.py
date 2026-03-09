@@ -26,11 +26,7 @@ class ChatCompletionRequest(BaseModel):
 @router.post("/v1/chat/completions")
 async def chat_completions(body: ChatCompletionRequest):
     # Strip any system messages from the client — the backend adds its own.
-    history = [
-        {"role": m.role, "content": m.content}
-        for m in body.messages
-        if m.role != "system"
-    ]
+    history = [{"role": m.role, "content": m.content} for m in body.messages if m.role != "system"]
 
     completion_id = f"chatcmpl-{uuid.uuid4().hex}"
     created = int(time.time())
@@ -56,9 +52,7 @@ async def chat_completions(body: ChatCompletionRequest):
                             }
                         ],
                     }
-                    loop.call_soon_threadsafe(
-                        queue.put_nowait, f"data: {json.dumps(chunk)}\n\n"
-                    )
+                    loop.call_soon_threadsafe(queue.put_nowait, f"data: {json.dumps(chunk)}\n\n")
             finally:
                 # Sentinel — signals the async side that we're done
                 loop.call_soon_threadsafe(queue.put_nowait, None)
@@ -71,16 +65,15 @@ async def chat_completions(body: ChatCompletionRequest):
                 break
             yield item
 
+        empty_delta: dict[str, str] = {}
         final = {
             "id": completion_id,
             "object": "chat.completion.chunk",
             "created": created,
             "model": model_name,
-            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+            "choices": [{"index": 0, "delta": empty_delta, "finish_reason": "stop"}],
         }
         yield f"data: {json.dumps(final)}\n\n"
         yield "data: [DONE]\n\n"
 
-    return StreamingResponse(
-        _sse_generator(), media_type="text/event-stream"
-    )
+    return StreamingResponse(_sse_generator(), media_type="text/event-stream")

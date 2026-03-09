@@ -89,3 +89,19 @@ uv run pytest tests
 cd frontend
 pnpm test
 ```
+
+## Static Analysis
+
+```bash
+# Backend
+cd backend
+uv run ruff check app
+uv run ruff format app
+uv run pyright app
+``` 
+
+```bash
+# Frontend
+cd frontend
+pnpm lint
+``` 

@@ -1,10 +1,13 @@
 import threading
 from collections.abc import Iterator
+from typing import Any, cast
 
 import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
     TextIteratorStreamer,
 )
 
@@ -15,19 +18,22 @@ SYSTEM_PROMPT = (
 )
 
 _lock = threading.Lock()
-_tokenizer: AutoTokenizer | None = None
-_model: AutoModelForCausalLM | None = None
+_tokenizer: PreTrainedTokenizerBase | None = None
+_model: PreTrainedModel | None = None
 _model_loaded = False
 
 
 def _load() -> None:
     global _tokenizer, _model, _model_loaded
     print(f"[model] Loading {MODEL_ID} on CPU ...")
-    _tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
-    _model = AutoModelForCausalLM.from_pretrained(
-        MODEL_ID,
-        torch_dtype=torch.float32,
-        low_cpu_mem_usage=True,
+    _tokenizer = cast(PreTrainedTokenizerBase, AutoTokenizer.from_pretrained(MODEL_ID))  # pyright: ignore[reportUnknownMemberType]
+    _model = cast(
+        PreTrainedModel,
+        AutoModelForCausalLM.from_pretrained(  # pyright: ignore[reportUnknownMemberType]
+            MODEL_ID,
+            torch_dtype=torch.float32,
+            low_cpu_mem_usage=True,
+        ),
     )
     _model.eval()
     _model_loaded = True
@@ -46,22 +52,26 @@ def is_loaded() -> bool:
     return _model_loaded
 
 
-def generate_reply(history: list[dict]) -> str:
+def generate_reply(history: list[dict[str, str]]) -> str:
     """
     history: list of {"role": str, "content": str} (without timestamps)
     Returns: assistant reply string
     """
     ensure_loaded()
+    assert _tokenizer is not None and _model is not None
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+    messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}] + history
 
     # Apply the model's built-in chat template.
     # add_generation_prompt=True appends the assistant turn prefix so the
     # model continues as the assistant, not as the user.
-    prompt_str = _tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
+    prompt_str = cast(
+        str,
+        _tokenizer.apply_chat_template(  # pyright: ignore[reportUnknownMemberType]
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        ),
     )
 
     # add_special_tokens=False because apply_chat_template already embeds
@@ -71,37 +81,41 @@ def generate_reply(history: list[dict]) -> str:
         return_tensors="pt",
         add_special_tokens=False,
     )
-    input_len = inputs["input_ids"].shape[-1]
+    input_len = cast(torch.Tensor, inputs["input_ids"]).shape[-1]
 
     with torch.no_grad():
-        output_ids = _model.generate(
+        output_ids = cast(Any, _model).generate(
             **inputs,
             max_new_tokens=256,
             do_sample=True,
             temperature=0.7,
             top_p=0.9,
             repetition_penalty=1.1,
-            pad_token_id=_tokenizer.eos_token_id,
+            pad_token_id=cast(int | None, _tokenizer.eos_token_id),  # pyright: ignore[reportUnknownMemberType]
         )
 
     # Decode only the newly generated tokens to strip the echoed prompt.
     new_tokens = output_ids[0][input_len:]
-    return _tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+    return cast(str, _tokenizer.decode(new_tokens, skip_special_tokens=True)).strip()  # pyright: ignore[reportUnknownMemberType]
 
 
-def generate_stream(history: list[dict]) -> Iterator[str]:
+def generate_stream(history: list[dict[str, str]]) -> Iterator[str]:
     """
     history: list of {"role": str, "content": str} (without timestamps)
     Yields assistant reply tokens one by one.
     """
     ensure_loaded()
+    assert _tokenizer is not None and _model is not None
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+    messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}] + history
 
-    prompt_str = _tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
+    prompt_str = cast(
+        str,
+        _tokenizer.apply_chat_template(  # pyright: ignore[reportUnknownMemberType]
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        ),
     )
 
     inputs = _tokenizer(
@@ -111,12 +125,12 @@ def generate_stream(history: list[dict]) -> Iterator[str]:
     )
 
     streamer = TextIteratorStreamer(
-        _tokenizer,
+        cast(AutoTokenizer, _tokenizer),
         skip_prompt=True,
         skip_special_tokens=True,
     )
 
-    generation_kwargs = {
+    generation_kwargs: dict[str, Any] = {
         **inputs,
         "streamer": streamer,
         "max_new_tokens": 256,
@@ -124,15 +138,12 @@ def generate_stream(history: list[dict]) -> Iterator[str]:
         "temperature": 0.7,
         "top_p": 0.9,
         "repetition_penalty": 1.1,
-        "pad_token_id": _tokenizer.eos_token_id,
+        "pad_token_id": cast(int | None, _tokenizer.eos_token_id),  # pyright: ignore[reportUnknownMemberType]
     }
 
-    thread = threading.Thread(
-        target=_model.generate, kwargs=generation_kwargs
-    )
+    thread = threading.Thread(target=cast(Any, _model).generate, kwargs=generation_kwargs)
     thread.start()
 
-    for token in streamer:
-        yield token
+    yield from streamer
 
     thread.join()
