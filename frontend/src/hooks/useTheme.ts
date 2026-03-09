@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Theme = "dark" | "light";
 
@@ -36,14 +36,13 @@ export function useTheme() {
     applyTheme(theme);
   }, [theme]);
 
-  function toggleTheme() {
+  const toggleTheme = useCallback(() => {
     setTheme((prev) => {
       const next: Theme = prev === "dark" ? "light" : "dark";
       localStorage.setItem("theme", next);
-      applyTheme(next);
       return next;
     });
-  }
+  }, []);
 
   return { theme, toggleTheme };
 }

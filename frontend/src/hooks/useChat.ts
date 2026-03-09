@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer } from "react";
 import { createConversation, openaiClient } from "@/lib/api";
 import type { Conversation, Message } from "@/types/chat";
 
-export interface ChatState {
+export type ChatState = {
   conversations: Conversation[];
   activeId: string | null;
   isLoading: boolean;
@@ -31,7 +31,7 @@ function saveToStorage(conversations: Conversation[]) {
   }
 }
 
-export type Action =
+type Action =
   | { type: "LOAD"; conversations: Conversation[] }
   | { type: "NEW_CONV"; id: string }
   | { type: "SELECT_CONV"; id: string }
@@ -159,7 +159,7 @@ export function useChat() {
     dispatch({ type: "SELECT_CONV", id });
   }, []);
 
-  const deleteConv = useCallback(async (id: string) => {
+  const deleteConv = useCallback((id: string) => {
     dispatch({ type: "DELETE_CONV", id });
   }, []);
 
@@ -187,7 +187,7 @@ export function useChat() {
 
       const conv = state.conversations.find((c) => c.id === convId);
       const priorMessages = (conv?.messages ?? []).map((m) => ({
-        role: m.role as "user" | "assistant",
+        role: m.role,
         content: m.content,
       }));
       const allMessages = [
@@ -230,7 +230,8 @@ export function useChat() {
             });
           }
         }
-      } catch {
+      } catch (err) {
+        console.error("sendMessage error:", err);
         dispatch({
           type: "SET_ERROR",
           error: "Failed to get a response. Please try again.",

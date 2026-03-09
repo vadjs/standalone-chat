@@ -33,7 +33,7 @@ async def chat_completions(body: ChatCompletionRequest):
     model_name = body.model
 
     async def _sse_generator():
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         queue: asyncio.Queue[str | None] = asyncio.Queue()
 
         def _produce():
@@ -57,7 +57,7 @@ async def chat_completions(body: ChatCompletionRequest):
                 # Sentinel — signals the async side that we're done
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
-        loop.run_in_executor(None, _produce)
+        fut = loop.run_in_executor(None, _produce)
 
         while True:
             item = await queue.get()
@@ -65,13 +65,14 @@ async def chat_completions(body: ChatCompletionRequest):
                 break
             yield item
 
-        empty_delta: dict[str, str] = {}
+        await fut  # re-raises any exception from the producer thread
+
         final = {
             "id": completion_id,
             "object": "chat.completion.chunk",
             "created": created,
             "model": model_name,
-            "choices": [{"index": 0, "delta": empty_delta, "finish_reason": "stop"}],
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
         }
         yield f"data: {json.dumps(final)}\n\n"
         yield "data: [DONE]\n\n"

@@ -4,17 +4,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import model
-from app.routes.chat import router as chat_router
 from app.routes.completions import router as completions_router
 from app.schemas import HealthResponse
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load the model at startup (blocking call, runs before first request)
     model.ensure_loaded()
     yield
-    # No cleanup needed for in-memory store
 
 
 app = FastAPI(title="SmolChat API", version="1.0.0", lifespan=lifespan)
@@ -27,7 +24,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(chat_router)
 app.include_router(completions_router)
 
 

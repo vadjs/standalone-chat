@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Message } from "@/types/chat";
+import type { Message } from "@/types/chat";
 
 interface Props {
   message: Message;
@@ -23,6 +23,7 @@ function CheckIcon() {
       viewBox="0 0 24 24"
       stroke="currentColor"
       strokeWidth={2.5}
+      aria-hidden="true"
     >
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
@@ -38,6 +39,7 @@ function CopyIcon() {
       viewBox="0 0 24 24"
       stroke="currentColor"
       strokeWidth={2}
+      aria-hidden="true"
     >
       <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
       <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
@@ -50,9 +52,13 @@ export default function MessageBubble({ message }: Props) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(message.content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy message:", err);
+    }
   }
 
   return (
@@ -92,6 +98,7 @@ export default function MessageBubble({ message }: Props) {
             {formatTime(message.timestamp)}
           </span>
           <button
+            type="button"
             onClick={handleCopy}
             title="Copy message"
             className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-pointer"
