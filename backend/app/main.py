@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import model
+from app.routes.chat import router as chat_router
 from app.routes.completions import router as completions_router
 from app.schemas import HealthResponse
 
@@ -14,7 +15,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SmolChat API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Standlone Chat API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(chat_router)
 app.include_router(completions_router)
 
 

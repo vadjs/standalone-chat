@@ -81,7 +81,7 @@ pnpm dev
 ```bash
 # Backend
 cd backend
-uv run pytest tests
+uv run python -m pytest tests
 ``` 
 
 ```bash

@@ -55,6 +55,48 @@ def is_loaded() -> bool:
     return _model_loaded
 
 
+def generate_reply(history: list[dict[str, str]]) -> str:
+    """
+    history: list of {"role": str, "content": str} (without timestamps)
+    Returns the full assistant reply as a string.
+    """
+    ensure_loaded()
+    assert _tokenizer is not None and _model is not None
+
+    messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+
+    prompt_str = cast(
+        str,
+        _tokenizer.apply_chat_template(  # pyright: ignore[reportUnknownMemberType]
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        ),
+    )
+
+    inputs = _tokenizer(
+        prompt_str,
+        return_tensors="pt",
+        add_special_tokens=False,
+    )
+
+    input_ids: torch.Tensor = inputs["input_ids"]
+    input_len = input_ids.shape[1]
+
+    output_ids: torch.Tensor = cast(Any, _model).generate(
+        input_ids,
+        max_new_tokens=256,
+        do_sample=True,
+        temperature=0.7,
+        top_p=0.9,
+        repetition_penalty=1.1,
+        pad_token_id=cast(int | None, _tokenizer.eos_token_id),  # pyright: ignore[reportUnknownMemberType]
+    )
+
+    new_tokens = output_ids[0][input_len:]
+    return cast(str, _tokenizer.decode(new_tokens, skip_special_tokens=True)).strip()  # pyright: ignore[reportUnknownMemberType]
+
+
 def generate_stream(history: list[dict[str, str]]) -> Iterator[str]:
     """
     history: list of {"role": str, "content": str} (without timestamps)
